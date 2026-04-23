@@ -10,7 +10,7 @@ Unpacks files from `KOG GC TEAM MASSFILE V.1.0` archives (Grand Chase Classic, S
 | 2         |       262,524 | **Yes**   | `.dds` textures, `.p3m` 3D models, `.frm` animations |
 | 3         |         5,201 | No        | `.lua` scripts, `.stg` strings  |
 
-**Total unlocked: ~98% of all game files** (278,770 of 284,000). Algo 3 scripts remain encrypted (per-file pre-inflate transform is out of scope).
+**Total unlocked: ~98% of all game files** (278,770 of 284,000). Algo 3 scripts remain encrypted (per-file pre-inflate).
 
 ## Install
 
@@ -83,4 +83,4 @@ Seed table: 300 entries, hard-coded in `gc_bf_seeds.py`.
 
 ## Credits
 
-Format reversed from a memory-dumped Grand Chase Epic build (unpacked `GrandChase.exe` binary). Steam build is Themida-protected; Epic build is not.
+Format reversed from a memory-dumped Grand Chase Epic build (unpacked `GrandChase.exe` binary). Steam build is Themida-protected; Epic build is not. :P
