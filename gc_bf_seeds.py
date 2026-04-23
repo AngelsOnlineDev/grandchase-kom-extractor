@@ -1,7 +1,6 @@
 # Blowfish seed table for Grand Chase Algo 2/3 XOR-decrypt.
 # Each row: 5 qwords summed (mod 2**64) -> formatted as decimal string
 # -> used as Blowfish key.
-# Source: Epic dump, VA 0x7FF74B075130  file@0x1C75130
 
 SEED_TABLE = [
     0,  # row 0
