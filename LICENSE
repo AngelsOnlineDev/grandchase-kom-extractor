@@ -2,9 +2,12 @@ MIT License
 
 Copyright (c) 2026 AngelsOnlineDev
 Copyright (c) 2026 Rockmizx (for the 13,790-entry Blowfish seed table in
-  gc_bf_seeds.py, the 106 AES-256-CBC key/IV pairs in gc_aes_keys.py, and
-  the AES-256-CBC algorithm-3 pipeline integrated in extract_kom.py —
-  originally from https://github.com/rockmizx/grandchase_toolkit)
+  gc_bf_seeds.py, the 106 AES-256-CBC key/IV pairs in gc_aes_keys.py, the
+  AES-256-CBC algorithm-3 pipeline integrated in extract_kom.py, and the
+  3-level fallback decompilation pipeline in decompile_kl.py — originally
+  from https://github.com/rockmizx/grandchase_toolkit)
+Copyright (c) 2013 Andrian Nord (for the LJD LuaJIT decompiler in
+  decompiler/ljd/ — see decompiler/LICENSE_LJD)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

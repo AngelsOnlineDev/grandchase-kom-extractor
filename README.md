@@ -1,6 +1,6 @@
-# Grand Chase `.kom` Full Extractor
+# Grand Chase `.kom` Full Extractor & Decompiler
 
-Unpacks files from `KOG GC TEAM MASSFILE V.1.0` archives (Grand Chase Classic, Steam / Epic).
+Unpacks files from `KOG GC TEAM MASSFILE V.1.0` archives (Grand Chase Classic, Steam / Epic) and decompiles the resulting KL Lua bytecode back to readable Lua source.
 
 ## Coverage
 
@@ -8,9 +8,9 @@ Unpacks files from `KOG GC TEAM MASSFILE V.1.0` archives (Grand Chase Classic, S
 |-----------|--------------:|:---------:|------------------------------|
 | 0         |        16,246 | **Yes**   | `.wav` audio, `.kstg` strings, misc |
 | 2         |       262,524 | **Yes**   | `.dds` textures, `.p3m` 3D models, `.frm` animations |
-| 3         |         5,201 | **Yes**   | `.lua` scripts, `.stg` strings |
+| 3         |         5,201 | **Yes**   | `.lua` scripts (KL bytecode), `.stg` strings |
 
-**All three algorithms supported. ~100% of game content extractable.**
+**All three algorithms supported. ~100% of game content extractable.** The Lua scripts come out as KL bytecode; run `decompile_kl.py` to turn them into readable Lua.
 
 ## Install
 
@@ -22,6 +22,8 @@ Python 3.10+ required.
 
 ## Usage
 
+### 1. Extract
+
 ```
 python extract_kom.py "C:/Program Files (x86)/Steam/steamapps/common/GrandChase/Texture/ui5.kom"
 
@@ -30,6 +32,20 @@ python extract_kom.py --all "C:/Program Files (x86)/Steam/steamapps/common/Grand
 
 First time a new Blowfish key is hit on an archive, the brute-force takes a moment; subsequent entries in the same archive use a hot-cache and are instant. Typical speed after warm-up: 50–100 entries/sec.
 
+### 2. Decompile (optional)
+
+Extracted `.lua` entries are KL bytecode (`1B 4B 4C 84` magic). To get readable Lua source:
+
+```
+# single file
+python decompile_kl.py ./extracted/Character_Elesis/InitSkillInfo_0_0.lua
+
+# whole tree
+python decompile_kl.py --all ./extracted --out ./decompiled
+```
+
+The decompiler also converts `.stg` UTF-16 strings to UTF-8 and copies plaintext files through unchanged, so the output tree mirrors the input.
+
 ## Output
 
 ```
@@ -37,7 +53,11 @@ extracted/
   <archive_name>/
     _index.xml       - decrypted XML listing of all entries
     _skipped.txt     - entries that failed to decrypt (reason shown)
-    <files ...>      - plaintext extracted files
+    <files ...>      - plaintext extracted files (Lua is KL bytecode)
+
+decompiled/
+  <archive_name>/
+    <files ...>      - readable Lua source + UTF-8 strings + copies
 ```
 
 ## Algorithm details
@@ -73,21 +93,29 @@ lua_bytes  = Blowfish_ECB.decrypt(zlib_plain, bf_key)  # same BF key scheme as A
 
 AES key/IV pairs are captured from the running game via Frida hooks. 106 pairs bundled in `gc_aes_keys.py`.
 
+### KL bytecode decompiler
+`decompile_kl.py` wraps Andrian Nord's [LJD](https://gitlab.com/znixian/luajit-decompiler) (LuaJIT decompiler) with a 3-level fallback (full → no-unwarper → minimal) and a dedicated thread with a 64 MB stack + size-proportional timeout so pathological inputs can't hang a batch run. LJD itself lives in `decompiler/ljd/` under its original MIT license.
+
 ## Updating keys
 
 If you get failures on new game content after a game update (KOG can rotate AES keys), capture fresh pairs via the Frida scripts in [`rockmizx/grandchase_toolkit`](https://github.com/rockmizx/grandchase_toolkit) and append to the `AES_PAIRS` list in `gc_aes_keys.py`.
 
 ## Files
 
-- `extract_kom.py`     – the extractor
-- `gc_keytable.py`     – 796-entry XML-decrypt key table
-- `gc_bf_seeds.py`     – 13,790-entry Blowfish seed table
-- `gc_aes_keys.py`     – 106 AES-256-CBC key/IV pairs
-- `README.md`          – this file
-- `LICENSE`            – MIT
+- `extract_kom.py`           – the extractor
+- `decompile_kl.py`          – the decompiler (KL bytecode → Lua source)
+- `gc_keytable.py`           – 796-entry XML-decrypt key table
+- `gc_bf_seeds.py`           – 13,790-entry Blowfish seed table
+- `gc_aes_keys.py`           – 106 AES-256-CBC key/IV pairs
+- `decompiler/ljd/`          – Andrian Nord's LJD decompiler (MIT)
+- `decompiler/LICENSE_LJD`   – LJD's original MIT license
+- `decompiler/ljd_main.py`   – LJD's standalone CLI (kept as reference)
+- `README.md`                – this file
+- `LICENSE`                  – MIT (repository license)
 
 ## Credits
 
-- **Algorithm 3** (AES-256-CBC outer layer), the 13,790-entry Blowfish seed table, and the bundled AES key/IV corpus come from [`rockmizx/grandchase_toolkit`](https://github.com/rockmizx/grandchase_toolkit) (MIT licensed — see `LICENSE`).
+- **Algorithm 3** (AES-256-CBC outer layer), the 13,790-entry Blowfish seed table, the bundled AES key/IV corpus, and the 3-level decompile pipeline come from [`rockmizx/grandchase_toolkit`](https://github.com/rockmizx/grandchase_toolkit) (MIT).
+- **LJD decompiler** (`decompiler/ljd/`) is [Andrian Nord's LuaJIT decompiler](https://gitlab.com/znixian/luajit-decompiler), © 2013 Andrian Nord (MIT).
 - Format and Algorithm 2 reversing was done against the unpacked Epic build of `GrandChase.exe`. Steam builds ship Themida-protected; Epic builds do not. :P
 - Partial V.0.3 reference / inspiration: [KOMCast](https://github.com/d3v1l401/KOMCast), [YuilKOM](https://github.com/YuilMuil/YuilKOM), [Els_kom_new](https://github.com/Elskom/Els_kom_new).
