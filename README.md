@@ -6,11 +6,11 @@ Unpacks files from `KOG GC TEAM MASSFILE V.1.0` archives (Grand Chase Classic, S
 
 | Algorithm | Files in game | Extracts? | Content type |
 |-----------|--------------:|:---------:|------------------------------|
-| 0         |        16,246 | Yes   | `.wav` audio, `.kstg` strings, misc |
+| 0         |        16,246 | **Yes**   | `.wav` audio, `.kstg` strings, misc |
 | 2         |       262,524 | **Yes**   | `.dds` textures, `.p3m` 3D models, `.frm` animations |
-| 3         |         5,201 | No        | `.lua` scripts, `.stg` strings  |
+| 3         |         5,201 | **Yes**   | `.lua` scripts, `.stg` strings |
 
-**Total unlocked: ~98% of all game files** (278,770 of 284,000). Algo 3 scripts remain encrypted (per-file pre-inflate).
+**All three algorithms supported. ~100% of game content extractable.**
 
 ## Install
 
@@ -22,65 +22,72 @@ Python 3.10+ required.
 
 ## Usage
 
-Extract one archive:
 ```
 python extract_kom.py "C:/Program Files (x86)/Steam/steamapps/common/GrandChase/Texture/ui5.kom"
-```
 
-Extract the whole game install tree:
-```
 python extract_kom.py --all "C:/Program Files (x86)/Steam/steamapps/common/GrandChase" --out ./extracted
 ```
 
-First run is slower — each unique `(MappedID, size)` combo takes ~100 ms to brute-force the Blowfish seed (~300 tries). Subsequent files with the same combo are instant via in-session cache.
-
-Typical per-archive speed after warm-up: **50–90 files/sec**.
+First time a new Blowfish key is hit on an archive, the brute-force takes a moment; subsequent entries in the same archive use a hot-cache and are instant. Typical speed after warm-up: 50–100 entries/sec.
 
 ## Output
 
 ```
 extracted/
   <archive_name>/
-    _index.xml       - decrypted XML file listing
-    _skipped.txt     - Algo-3 entries (not extracted)
+    _index.xml       - decrypted XML listing of all entries
+    _skipped.txt     - entries that failed to decrypt (reason shown)
     <files ...>      - plaintext extracted files
 ```
 
 ## Algorithm details
 
-### XML index decryption
+### XML index
+Three rotating 32-bit XOR keys, indexed by `xml_size`:
 ```
 start_index = (12 * (xml_size % 200) + 12) / 4
 keys = [KEYS[start_index + 0..2]]
 output[i*4 .. i*4+4] = input[i*4 .. i*4+4] XOR keys[i % 3]
 ```
-Key table: 796 entries, hard-coded in `gc_keytable.py`.
+796-entry key table in `gc_keytable.py`.
 
-### Algorithm 0 (plaintext bucket)
-Simple zlib deflate. Inflate, done.
+### Algorithm 0
+Simple zlib inflate.
 
-### Algorithm 2 (the interesting one)
-Per-file Blowfish with a key derived from a table lookup normally keyed by the file's `MappedID`:
-
+### Algorithm 2
+Per-entry Blowfish-ECB with a key derived from a seed-table row:
 ```
-permute(MappedID, file_size)        # byte swap + interleave + rotate
-seed_idx = MAP[permuted]            # runtime map from komdatalist.xml — missing!
-sum      = sum(SEED_TABLE[seed_idx].qword[0..4]) mod 2**64
-key      = SHA256(str(sum)).digest()                 # 32 bytes
-plain    = zlib.inflate(Blowfish_ECB.decrypt(ciphertext, key))
+bf_key = SHA256(str(SEED_TABLE[i])).digest()           # 32 bytes
+plain  = zlib.inflate( Blowfish_ECB.decrypt(ct, bf_key) )
 ```
 
-The runtime map is populated from a `komdatalist.xml` fetched from KOG's server, which isn't shipped with the install. We brute-force `seed_idx` per unique `(MappedID, file_size)` combination (≈ 12,000 total in the full game). First hit caches and all later occurrences are instant.
+Normally `i` (the seed index) would be looked up in a runtime map populated from server-fetched `komdatalist.xml`. Since that file isn't shipped, we brute-force the index against `SEED_TABLE` (13,790 entries). Per-archive hot-caching keeps this fast after the first hit.
 
-Seed table: 300 entries, hard-coded in `gc_bf_seeds.py`.
+### Algorithm 3
+AES-256-CBC wrapper around an Algo-2-style payload:
+```
+aes_plain  = AES_256_CBC.decrypt(ct, aes_key, iv)      # key/iv from AES_PAIRS
+zlib_plain = zlib.inflate(aes_plain)
+lua_bytes  = Blowfish_ECB.decrypt(zlib_plain, bf_key)  # same BF key scheme as Algo 2
+```
+
+AES key/IV pairs are captured from the running game via Frida hooks. 106 pairs bundled in `gc_aes_keys.py`.
+
+## Updating keys
+
+If you get failures on new game content after a game update (KOG can rotate AES keys), capture fresh pairs via the Frida scripts in [`rockmizx/grandchase_toolkit`](https://github.com/rockmizx/grandchase_toolkit) and append to the `AES_PAIRS` list in `gc_aes_keys.py`.
 
 ## Files
 
-- `extract_kom.py`   – the extractor
-- `gc_keytable.py`   – 796-entry XML-decrypt key table
-- `gc_bf_seeds.py`   – 300-entry per-file seed sum table
-- `README.md`        – this file
+- `extract_kom.py`     – the extractor
+- `gc_keytable.py`     – 796-entry XML-decrypt key table
+- `gc_bf_seeds.py`     – 13,790-entry Blowfish seed table
+- `gc_aes_keys.py`     – 106 AES-256-CBC key/IV pairs
+- `README.md`          – this file
+- `LICENSE`            – MIT
 
 ## Credits
 
-Format reversed from a memory-dumped Grand Chase Epic build (unpacked `GrandChase.exe` binary). Steam build is Themida-protected; Epic build is not. :P
+- **Algorithm 3** (AES-256-CBC outer layer), the 13,790-entry Blowfish seed table, and the bundled AES key/IV corpus come from [`rockmizx/grandchase_toolkit`](https://github.com/rockmizx/grandchase_toolkit) (MIT licensed — see `LICENSE`).
+- Format and Algorithm 2 reversing was done against the unpacked Epic build of `GrandChase.exe`. Steam builds ship Themida-protected; Epic builds do not. :P
+- Partial V.0.3 reference / inspiration: [KOMCast](https://github.com/d3v1l401/KOMCast), [YuilKOM](https://github.com/YuilMuil/YuilKOM), [Els_kom_new](https://github.com/Elskom/Els_kom_new).
