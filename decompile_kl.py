@@ -22,6 +22,17 @@ HERE = Path(__file__).parent
 # Make LJD importable
 sys.path.insert(0, str(HERE / "decompiler"))
 
+# Fail loudly up-front if the LJD bundle isn't present — otherwise every
+# decompile task silently errors in its worker thread and the CLI reports
+# `Failed: <all files>` with no hint why.
+if not (HERE / "decompiler" / "ljd" / "__init__.py").is_file():
+    sys.exit(
+        "error: LJD decompiler not found at "
+        f"{HERE / 'decompiler' / 'ljd'}\n"
+        "Re-clone or re-download the repo — `decompiler/ljd/` is required:\n"
+        "  git clone https://github.com/AngelsOnlineDev/grandchase-kom-extractor"
+    )
+
 # LJD does a lot of recursion; push the recursion limit up globally
 sys.setrecursionlimit(20000)
 
